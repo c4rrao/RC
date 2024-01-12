@@ -1694,6 +1694,11 @@ string req_bid(istringstream &reqstream){
 
                 
                 if (std::filesystem::exists(curr_auction_dir)){
+
+                    if (update_auction(AID) == -1) {
+                        STATUS("Error updating auction.")
+                        return "BAD\n";
+                    }
                     
                     //checkar se o auction e do user
                     if (!std::filesystem::exists(user_auction_hosted_file)){
@@ -1703,7 +1708,7 @@ string req_bid(istringstream &reqstream){
 
                             std::filesystem::path bids_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append(BIDS_DIR_PATH);
 
-                            if (!std::filesystem::exists(bids_dir) && !std::filesystem::is_empty(bids_dir)){
+                            if (std::filesystem::exists(bids_dir) && !std::filesystem::is_empty(bids_dir)){
                                 vector<string> file_names;
                                 try {
 
@@ -1830,10 +1835,10 @@ string req_bid(istringstream &reqstream){
                                 bid_stream.close();
                                 return "BAD\n";
                             }
-                            return "RBD OK\n";
+                            return "RBD ACC\n";
                         
                         }
-                        else return "RBD AID\n"; //AID is not active
+                        else return "RBD NOK\n"; //AID is not active
                     }
                     else return "RBD ILG\n"; //Auction is hosted my user
                 }
