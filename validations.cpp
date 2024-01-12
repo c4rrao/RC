@@ -19,13 +19,14 @@ bool is_valid_ip (string ip) {
 }
 
 bool is_valid_AID(string AID){
-    if (AID.length() != AID_SIZE){
+
+    if (strlen(AID.c_str()) != AID_SIZE){
         STATUS("AID is not size 3")
         return false;
     }
 
-    for (char c : AID) {
-        if (!isdigit(c)) {
+    for (int i = 0; i < AID_SIZE; i++) {
+        if (!isdigit(AID[i])) {
             STATUS("AID is not numeric")
             return false;  // If any character is not a digit, the string is not numeric
         }

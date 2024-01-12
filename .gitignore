@@ -3,8 +3,8 @@
 *.out
 *.o
 *.exe
-# *.jpg
-# *.txt
+*.jpg
+*.txt
 DB
 assets
 AS

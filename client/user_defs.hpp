@@ -12,10 +12,10 @@
     {if (STATUS_ON) {printf("[STATUS]: " format "  [Line %d] [File %s]\n", __VA_ARGS__, __LINE__, __FILE__);}}
 
 #define MSG(msg)                    \
-    {printf("%s", msg); if (STATUS_ON) printf("%s\n", msg);}               \
+    {printf("%s\n", msg);}               \
 
 #define MSG_WA(format, ...)         \
-    {printf(format, __VA_ARGS__ ); if (STATUS_ON) printf(format "\n", __VA_ARGS__);} \
+    {printf(format "\n", __VA_ARGS__ );} \
 
 #define PUBLIC_PORT ("58011")
 #define PUBLIC_IP ("tejo.tecnico.ulisboa.pt")

@@ -664,7 +664,7 @@ string req_showrecord(istringstream &reqstream){
     }
 
     if (!is_valid_AID(AID)){
-        STATUS_WA("AID is not correctly formatted: %s", AID.c_str())
+        STATUS_WA("AID is not correctly formatted: \"%s\"", AID.c_str())
         return "RRC ERR\n";
     }
 
@@ -1018,7 +1018,7 @@ string req_open(istringstream &reqstream){
         return "ROA ERR\n";
     }
 
-    if (!is_valid_auction_name){
+    if (!is_valid_auction_name(name)){
         STATUS("Auction name is not valid.")
         return "ROA ERR\n";
     }
@@ -1177,16 +1177,21 @@ string req_open(istringstream &reqstream){
             }
 
             int old_n = strlen(tempBuf);
-            int written=0, total_written=0;
+            int written=0, total_written=0, total_read=0;
             
             written = fwrite(tempBuf,1,old_n,asset);
             total_written += written;
-
+            total_read += written;
 
             while (total_written < asset_fsize){
                 memset(sv.TCP.buffer,0,BUFFER_SIZE+1);
-                if (read_timer(sv.TCP.fd) == -1) return "BAD\n";
+                if (read_timer(sv.TCP.fd) == -1) {
+                    STATUS_WA("total_read: %d | total_written: %d | asset_fsize: %d", total_read, total_written, asset_fsize)
+                    return "BAD\n";
+                }
                 n = read(sv.TCP.fd, sv.TCP.buffer, BUFFER_SIZE);
+
+                total_read += n;
 
                 if (n==-1){
                     STATUS("Could not receive show asset reply.")
@@ -1197,6 +1202,7 @@ string req_open(istringstream &reqstream){
                 if (n == 0) {
                     if (total_written < asset_fsize) {
                         STATUS("Could not receive all asset.")
+                        STATUS_WA("total_read: %d | total_written: %d | asset_fsize: %d | buffer size: %ld", total_read, total_written, asset_fsize, strlen(sv.TCP.buffer))
                         req_open_rollback(UID,AID_str);
                         return "ROA ERR\n";
                     }
@@ -1204,6 +1210,11 @@ string req_open(istringstream &reqstream){
                 }
 
                 written = fwrite(sv.TCP.buffer, 1, n, asset);
+
+                if (written != n){
+                    STATUS("Não escreveu tudo.")
+                }
+
                 total_written += written;
             }
 
@@ -1239,6 +1250,8 @@ string req_open(istringstream &reqstream){
             fclose(asset);
 
             STATUS_WA("There were written %d bytes to asset file", total_written)
+
+            STATUS_WA("total_read: %d | total_written: %d | asset_fsize: %ld", total_read, total_written, asset_fsize)
 
             if (total_written!=asset_fsize){
                 STATUS("Bytes written to asset file != fsize")
@@ -1442,9 +1455,9 @@ void req_showasset(istringstream &reqstream){
             break;
         }
 
-
+        AID = AID.substr(0, 3);
         if (!is_valid_AID(AID)){
-            STATUS("Show asset is not correctly formatted.")
+            STATUS_WA("AID provided is not valid: \"%s\"", AID.c_str())
             reply = "RSA ERR\n";
             break;
         }
@@ -1456,18 +1469,25 @@ void req_showasset(istringstream &reqstream){
         }
 
 
-        std::filesystem::path auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);
+        std::filesystem::path auction_dir = std::filesystem::path(DB_DIR_PATH)/AUCTIONS_DIR_PATH/AID;
         std::filesystem::path auction_asset_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append(ASSET_DIR_PATH);
         
-        if(std::filesystem::exists(auction_dir) && (std::filesystem::exists(auction_asset_dir)) && (!std::filesystem::is_empty(auction_dir))){
+        STATUS_WA("auction_dir: %s", auction_dir.c_str())
+        STATUS_WA("auction_asset_dir: %s", auction_asset_dir.c_str())
+
+        if(std::filesystem::exists(auction_dir) && (std::filesystem::exists(auction_asset_dir)) && (!std::filesystem::is_empty(auction_asset_dir))){
             int fileCount = 0;
             string filename;
             try {
                 for (const auto& entry : std::filesystem::directory_iterator(auction_asset_dir)) {
-                    if (std::filesystem::is_regular_file(entry)) {
-                        filename = entry.path().filename();
-                        fileCount++;
-                    }
+                    //iterate for files that arent directories
+                    STATUS_WA("<trash>filename: %s", entry.path().filename().c_str())
+                    if (entry.is_directory()) continue;
+                    filename = entry.path().filename();
+
+                    STATUS_WA("filename: %s", filename.c_str())
+
+                    break;
                 }
             } catch (const exception& e) {
                 STATUS("Error iterating through directory")
@@ -1475,11 +1495,11 @@ void req_showasset(istringstream &reqstream){
                 break;
             }
 
-            if (fileCount != 1){
-                STATUS("There are more than 1 file in asset folder")
-                reply = "BAD\n";
-                break;
-            }
+            // if (fileCount != 1){
+            //     STATUS_WA("There are more than 1 file in asset folder: %d", fileCount)
+            //     reply = "BAD\n";
+            //     break;
+            // }
             
             reply += "OK " + filename;
 
@@ -1519,24 +1539,12 @@ void req_showasset(istringstream &reqstream){
             long file_size = ftell(file);
             rewind(file);
 
-
             memset(sv.TCP.buffer, 0, BUFFER_SIZE+1);
             size_t bytesRead = 0;
             int flag = 0;
             int total_written = 0;
+            int total_read = 0;
 
-
-
-            int ld;
-            ld = write(sv.TCP.fd,reply.c_str(),reply.length());
-            if (ld==-1){
-                STATUS("Could not send show asset reply.")
-                reply = "BAD\n";
-                flag = 1;
-                break;
-            }
-
-    
             while(total_written < fileSize){
 
                 memset(sv.TCP.buffer,0,BUFFER_SIZE+1);
@@ -1547,15 +1555,19 @@ void req_showasset(istringstream &reqstream){
                     flag = 1;
                     break;
                 }
-
+                total_read += bytesRead;
 
                 size_t n = write(sv.TCP.fd, sv.TCP.buffer, strlen(sv.TCP.buffer));
+                // while (n < bytesRead){
+                //     n += write(sv.TCP.fd, sv.TCP.buffer+n, bytesRead-n);
+                // }
+
                 if( n==-1){
                     STATUS("Could not write asset file")
                     flag = 1;
                     break;
                 }
-                total_written += n;
+                total_written += bytesRead;
                 STATUS_WA("totalwritten: %d", total_written)
             }
 
@@ -1585,12 +1597,6 @@ void req_showasset(istringstream &reqstream){
 
 
     STATUS_WA("Show asset message: %s",reply.c_str())
-    int ldd = write(sv.TCP.fd,reply.c_str(),reply.length());
-    if (ldd==-1){
-        STATUS("Could not send show asset reply.")
-        return;
-    }
-
 }
 
 string req_bid(istringstream &reqstream){
@@ -1636,6 +1642,12 @@ string req_bid(istringstream &reqstream){
 
     if (!is_valid_bid_value(value)){
         STATUS("AID is not correctly formatted.")
+        return "RBD ERR\n";
+    }
+
+    string trash;
+    if (!(reqstream >> trash)){
+        STATUS("Bid request doesn't have a value")
         return "RBD ERR\n";
     }
 
@@ -1723,6 +1735,34 @@ string req_bid(istringstream &reqstream){
                                     return "RBD REF\n"; 
                                 }
                             }
+                            else{
+
+                                std::filesystem::path start_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("START_" + AID + ".txt");
+
+                                ifstream start_stream(start_auction_file);
+
+                                if (!(start_stream.is_open())){
+                                    STATUS("Couldn't open start auction file")
+                                    start_stream.close();
+                                    return "BAD\n";
+                                }
+
+                                int start_value;
+
+                                if (!(start_stream>>trash>>trash>>trash>>start_value)){
+                                    STATUS("Error reading from START file")
+                                    start_stream.close();
+                                    return "BAD\n";
+                                }
+
+                                start_stream.close();
+
+                                STATUS_WA("start_value: %d | value: %d", start_value,value)
+
+                                if (value <= start_value){ //a bid é menor do que a maior
+                                    return "RBD REF\n"; 
+                                }
+                            }
                             
                             char fname[7];
                             sprintf(fname, "%06d", value);
@@ -1735,8 +1775,6 @@ string req_bid(istringstream &reqstream){
                                 bid_stream.close();
                                 return "BAD\n";
                             }
-
-
 
                             bid_stream.close();
 
@@ -1811,69 +1849,96 @@ string req_bid(istringstream &reqstream){
     return "BAD\n";
 }
 
+
+int count_spaces(string str){
+    int count = 0;
+    for (int i = 0; i < str.length(); i++){
+        if (str[i] == ' ') count++;
+    }
+    return count;
+}
+
 int handle_TCP_req(){   
 
+    bool err_with_st = false;
+    string sbuff = "";
     size_t n = 0;
 
-    memset(sv.TCP.buffer, 0, BUFFER_SIZE+1);
-    if (read_timer(sv.TCP.fd) == -1) return -1;
-    n = read(sv.TCP.fd, sv.TCP.buffer, BUFFER_SIZE);
+    // 76 is the max length of the reply without the last space and the Fdata of the open command
+    for (int total_n = 0; total_n < 76;) {
 
-    if (n == -1) {
-        STATUS("Could not receive tcp request.")
-        
+        memset(sv.TCP.buffer, 0, BUFFER_SIZE+1);
+        if (read_timer(sv.TCP.fd) == -1) {
+            STATUS_WA("sbuff: %s", sbuff.c_str())
+
+            if (total_n >= 3) err_with_st = true;
+            break;
+        }
+        n = read(sv.TCP.fd, sv.TCP.buffer, BUFFER_SIZE);
+        total_n += n;
+
+        sbuff += string(sv.TCP.buffer);
+
+        if (n < 0) {
+            STATUS("Could not receive tcp reply.")
+            return -1;
+        }
+        if (sbuff[total_n - 1] == '\n') {
+            STATUS("No more bytes in tcp message.")
+            sbuff[total_n - 1] = '\0';
+            break;
+        }
+        else if (sbuff.substr(0, 3) == "OPA" && count_spaces(sbuff) >= 8) {
+            STATUS("No more bytes in tcp message - open big file.")
+            break;
+        }
     }
-    if (n == 0) {
-        STATUS("Empty tcp message.")
-        return -1;
-    }
-    string buff = string(sv.TCP.buffer);
 
 
-    istringstream reqstream(buff);
+    istringstream reqstream(sbuff);
     string opcode, reply;
 
     if (reqstream.str().length()>200) LOG_WA(sv.verbose,"Received request: %s...", reqstream.str().substr(0,200).c_str())
     else LOG_WA(sv.verbose,"Received request: %s", reqstream.str().c_str())
     
+    string request_type;
     STATUS_WA("Received request: %s", reqstream.str().c_str())
-    if (!(reqstream >> opcode)){
-        STATUS("There's no opcode in the request")
+    if (!(reqstream>>request_type)){
+        STATUS("Invalid command")
         return -1;
     }
-    if (opcode == "OPA"){
-        reply = req_open(reqstream);
-    }
-    else{
-        string sbuff = string(sv.TCP.buffer);
-        //remove the last /n from sbuff
-        if (sbuff[sbuff.length() - 1] == '\n'){
-            sbuff = sbuff.substr(4);
-            sbuff = sbuff.substr(0, sbuff.length() - 1);
-            STATUS_WA("Request: \"%s\"", sbuff.c_str())
-        }
-        else {
-            STATUS("No newline at the end of the message.")
-            return -1;
-        }
-        reqstream = istringstream(sbuff);
 
-        if (opcode == "CLS"){
-            reply = req_close(reqstream);
+    if (request_type == "OPA"){
+        if (err_with_st) reply = "RLI ERR\n";
+        else {
+            reply = req_open(reqstream);
         }
-        else if (opcode == "SAS"){
+    }
+
+        else if (request_type == "CLS"){
+            if (err_with_st) reply = "RCL ERR\n";
+            else {
+                reply = req_close(reqstream);
+            }
+        }
+
+    else if (request_type == "SAS"){
+        if (err_with_st) reply = "RSA ERR\n";
+        else {
             req_showasset(reqstream);
             return 0;
         }
-        else if (opcode == "BID"){
-            reply = req_bid(reqstream);
-            STATUS_WA("Replyyyyyyyyyyyy: %s", reply.c_str())
-        }
+    }
+    
+    else if (request_type == "BID"){
+        if (err_with_st) reply = "RBD ERR\n";
         else {
-            reply = "ERR\n";
+            reply = req_bid(reqstream);
         }
     }
+    else reply = "ERR\n";
 
+    //send reply
     n = write(sv.TCP.fd, reply.c_str(), reply.length());
     if (n == -1) {
         STATUS("Could not send message")
@@ -1885,7 +1950,7 @@ int handle_TCP_req(){
     return 0;
 }
 
-int     UDP_req(string req){
+int handle_UDP_req(string req){
 
     if (req[req.length() - 1] == '\n'){
         req = req.substr(0, req.length() - 1);

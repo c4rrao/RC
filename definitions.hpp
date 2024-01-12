@@ -25,7 +25,7 @@
 
 using namespace std;
 
-#define STATUS_ON (0)
+#define STATUS_ON (1)
 
 #define PORT ("58036")
 
@@ -67,10 +67,10 @@ typedef struct protocol {
     }
 
 #define LOG(active, msg)                                                     \
-    {if (active) {printf("[LOG]: %s", msg);}}
+    {if (active) {printf("[LOG]: %s\n", msg);}}
 
 #define LOG_WA(active, format, ...)                                          \
-    {if (active) {printf("[LOG]: " format " ", __VA_ARGS__);}}
+    {if (active) {printf("[LOG]: " format "\n", __VA_ARGS__);}}
 
 #define STATUS(msg)                                                     \
     {if (STATUS_ON) {printf("[STATUS]: %s  [Line %d] [File %s]\n", msg, __LINE__, __FILE__);}}
