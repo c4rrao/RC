@@ -185,6 +185,7 @@ string req_login(istringstream &reqstream){
         return "RLI ERR\n";
     }
 
+    req_pass = string(req_pass.c_str());
     if (!is_valid_pass(req_pass)) {
         STATUS("Password is not correctly formatted.")
         return "RLI ERR\n";
@@ -310,6 +311,7 @@ string req_logout(istringstream &reqstream){
         return "RLO ERR\n";
     }
 
+    req_pass = string(req_pass.c_str());
     if (!is_valid_pass(req_pass)) {
         STATUS("Password is not correctly formatted.")
         return "RLO ERR\n";
@@ -390,6 +392,7 @@ string req_unregister(istringstream &reqstream){
         return "RUR ERR\n";
     }
 
+    req_pass = string(req_pass.c_str());
     if (!is_valid_pass(req_pass)) {
         STATUS("Password is not correctly formatted.")
         return "RUR ERR\n";
@@ -471,6 +474,7 @@ string req_myauctions(istringstream &reqstream){
         return "RMA ERR\n";
     }
 
+    UID = string(UID.c_str());
     if (!is_valid_UID(UID)){
         STATUS("UID is not correctly formatted.")
         return "RMA ERR\n";
@@ -494,6 +498,8 @@ string req_myauctions(istringstream &reqstream){
         else {
             reply += "OK";
             try {
+                vector<string> AID_list; 
+
                 for (const auto& entry : std::filesystem::directory_iterator(uid_hosted_dir)) {
                     if (std::filesystem::is_regular_file(entry.path())) { // Reply este if é preciso?
                         string AID;
@@ -503,23 +509,28 @@ string req_myauctions(istringstream &reqstream){
                             STATUS("Auction file name is not a valid AID.")
                             return "BAD\n";
                         }
-
-                        reply += " " + AID;
-
-                        std::filesystem::path auction_dir_lock = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID+".lock");
-                        std::filesystem::path curr_auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);
-                        std::filesystem::path end_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("END_" + AID + ".txt");
-
-                        if (update_auction(AID) == -1) {
-                            STATUS("Error updating auction.")
-                            return "BAD\n";
-                        }
-
-                        if (!(std::filesystem::exists(end_auction_file))){
-                            reply += " 1";
-                        }
-                        else reply += " 0";
+                        AID_list.push_back(AID);
                     }
+                }
+
+                sort(AID_list.begin(), AID_list.end());
+
+                for (const auto& AID : AID_list) {
+                    reply += " " + AID;
+
+                    std::filesystem::path auction_dir_lock = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID+".lock");
+                    std::filesystem::path curr_auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);
+                    std::filesystem::path end_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("END_" + AID + ".txt");
+
+                    if (update_auction(AID) == -1) {
+                        STATUS("Error updating auction.")
+                        return "BAD\n";
+                    }
+
+                    if (!(std::filesystem::exists(end_auction_file))){
+                        reply += " 1";
+                    }
+                    else reply += " 0";
                 }
                 reply += "\n";
             } catch (const filesystem::filesystem_error& e) {
@@ -544,6 +555,7 @@ string req_mybids(istringstream &reqstream){
         return "RMB ERR\n";
     }
 
+    UID = string(UID.c_str());
     if (!is_valid_UID(UID)){
         STATUS("UID is not correctly formatted.")
         return "RMB ERR\n";
@@ -568,6 +580,8 @@ string req_mybids(istringstream &reqstream){
         else{
             reply += "OK";
             try {
+                vector<string> AID_list; 
+
                 for (const auto& entry : std::filesystem::directory_iterator(uid_bidded_dir)) {
                     if (std::filesystem::is_regular_file(entry.path())) { // Reply este if é preciso?
                         string AID;
@@ -577,18 +591,28 @@ string req_mybids(istringstream &reqstream){
                             STATUS("Auction file name is not a valid AID.")
                             return "BAD\n";
                         }
-
-                        reply += " " + AID;
-
-                        std::filesystem::path auction_dir_lock = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID+".lock");
-                        std::filesystem::path curr_auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);
-                        std::filesystem::path end_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("END_" + AID + ".txt");
-                        
-                        if (!(std::filesystem::exists(end_auction_file))){
-                            reply += " 1";
-                        }
-                        else reply += " 0";
+                        AID_list.push_back(AID);
                     }
+                }
+
+                sort(AID_list.begin(), AID_list.end());
+
+                for (const auto& AID : AID_list) {
+                    reply += " " + AID;
+
+                    std::filesystem::path auction_dir_lock = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID+".lock");
+                    std::filesystem::path curr_auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);
+                    std::filesystem::path end_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("END_" + AID + ".txt");
+
+                    if (update_auction(AID) == -1) {
+                        STATUS("Error updating auction.")
+                        return "BAD\n";
+                    }
+
+                    if (!(std::filesystem::exists(end_auction_file))){
+                        reply += " 1";
+                    }
+                    else reply += " 0";
                 }
                 reply += "\n";
             } catch (const filesystem::filesystem_error& e) {
@@ -616,31 +640,37 @@ string req_list(){
     else {
         reply += "OK";
             try {
+                vector<string> AID_list; 
+
                 for (const auto& entry : std::filesystem::directory_iterator(auctions_dir)) {
-                        string AID;
-                        AID = entry.path().stem().string();
-                        std::filesystem::path auction_dir_lock = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID+".lock");
+                    string AID;
+                    AID = entry.path().stem().string();
 
-                        if (!is_valid_AID(AID)){
-                                STATUS("Auction file name is not a valid AID.")
-                                return "BAD\n";
-                        }
+                    if (!is_valid_AID(AID)){
+                        STATUS("Auction file name is not a valid AID.")
+                        return "BAD\n";
+                    }
+                    AID_list.push_back(AID);
+                }
 
-                        reply += " " + AID;
+                sort(AID_list.begin(), AID_list.end());
 
+                for (const auto& AID : AID_list) {
+                    reply += " " + AID;
 
-                        std::filesystem::path curr_auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);
-                        std::filesystem::path end_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("END_" + AID + ".txt");
-                        
-                        if (update_auction(AID) == -1) {
-                            STATUS("Error updating auction.")
-                            return "BAD\n";
-                        }
+                    std::filesystem::path auction_dir_lock = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID+".lock");
+                    std::filesystem::path curr_auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);
+                    std::filesystem::path end_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("END_" + AID + ".txt");
 
-                        if (!(std::filesystem::exists(end_auction_file))){
-                            reply += " 1";
-                        }
-                        else reply += " 0";
+                    if (update_auction(AID) == -1) {
+                        STATUS("Error updating auction.")
+                        return "BAD\n";
+                    }
+
+                    if (!(std::filesystem::exists(end_auction_file))){
+                        reply += " 1";
+                    }
+                    else reply += " 0";
                 }
                 reply += "\n";
             } catch (const filesystem::filesystem_error& e) {
@@ -663,6 +693,7 @@ string req_showrecord(istringstream &reqstream){
         return "RRC ERR\n";
     }
 
+    AID = string(AID.c_str());
     if (!is_valid_AID(AID)){
         STATUS_WA("AID is not correctly formatted: \"%s\"", AID.c_str())
         return "RRC ERR\n";
@@ -1187,7 +1218,8 @@ string req_open(istringstream &reqstream){
                 memset(sv.TCP.buffer,0,BUFFER_SIZE+1);
                 if (read_timer(sv.TCP.fd) == -1) {
                     STATUS_WA("total_read: %d | total_written: %d | asset_fsize: %d", total_read, total_written, asset_fsize)
-                    return "BAD\n";
+                    req_open_rollback(UID,AID_str);
+                    return "ROA ERR\n";
                 }
                 n = read(sv.TCP.fd, sv.TCP.buffer, BUFFER_SIZE);
 
@@ -1318,6 +1350,7 @@ string req_close(istringstream &reqstream){
         return "RCL ERR\n";
     }
 
+    AID = string(AID.c_str());
     if (!is_valid_AID(AID)){
         STATUS("AID is not correctly formatted.")
         return "RCL ERR\n";
@@ -1363,6 +1396,8 @@ string req_close(istringstream &reqstream){
                 std::filesystem::path end_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("END_" + AID + ".txt");
                 std::filesystem::path start_auction_file = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID).append("START_" + AID + ".txt");
                 std::filesystem::path user_auction_hosted_file = std::filesystem::path(DB_DIR_PATH).append(USERS_DIR_PATH).append(UID).append(HOSTED_DIR_PATH).append(AID+".txt");
+
+                STATUS_WA("user_auction_hosted_file: %s", user_auction_hosted_file.c_str())
 
                 //checkar se o auction existe
                 if (std::filesystem::exists(curr_auction_dir)){
@@ -1455,7 +1490,7 @@ void req_showasset(istringstream &reqstream){
             break;
         }
 
-        AID = AID.substr(0, 3);
+        AID = string(AID.c_str());
         if (!is_valid_AID(AID)){
             STATUS_WA("AID provided is not valid: \"%s\"", AID.c_str())
             reply = "RSA ERR\n";
@@ -1635,19 +1670,16 @@ string req_bid(istringstream &reqstream){
         return "RBD ERR\n";
     }
 
-    if (!(reqstream >> value)){
+    string sval;
+    if (!(reqstream >> sval)){
         STATUS("Bid request doesn't have a value")
         return "RBD ERR\n";
     }
 
+    sval = string(sval.c_str());
+    value = stoi(sval);
     if (!is_valid_bid_value(value)){
         STATUS("AID is not correctly formatted.")
-        return "RBD ERR\n";
-    }
-
-    string trash;
-    if (!(reqstream >> trash)){
-        STATUS("Bid request doesn't have a value")
         return "RBD ERR\n";
     }
 
@@ -1660,7 +1692,7 @@ string req_bid(istringstream &reqstream){
     std::filesystem::path pass_path = std::filesystem::path(DB_DIR_PATH).append(USERS_DIR_PATH).append(UID).append(UID + "_pass.txt");
     std::filesystem::path login_path = std::filesystem::path(DB_DIR_PATH).append(USERS_DIR_PATH).append(UID).append(UID + "_login.txt");
 
-
+    string trash;
     if(std::filesystem::exists(user_dir)){
 
         if (std::filesystem::exists(login_path)){
@@ -1684,8 +1716,6 @@ string req_bid(istringstream &reqstream){
 
             pass_stream.close();
 
-
-            
             if (req_pass == password){
                 
                 std::filesystem::path curr_auction_dir = std::filesystem::path(DB_DIR_PATH).append(AUCTIONS_DIR_PATH).append(AID);

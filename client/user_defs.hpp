@@ -11,11 +11,15 @@
 #define STATUS_WA(format, ...)                                          \
     {if (STATUS_ON) {printf("[STATUS]: " format "  [Line %d] [File %s]\n", __VA_ARGS__, __LINE__, __FILE__);}}
 
-#define MSG(msg)                    \
-    {printf("%s\n", msg);}               \
+#define MSG(msg)                                                        \
+    {printf("%s", msg);                                                 \
+    if (STATUS_ON) printf(" [Line %d] [File %s]", __LINE__, __FILE__);    \
+    printf("\n");}                                                      \
 
-#define MSG_WA(format, ...)         \
-    {printf(format "\n", __VA_ARGS__ );} \
+#define MSG_WA(format, ...)                                             \
+    {printf(format, __VA_ARGS__);                                       \
+    if (STATUS_ON) printf(" [Line %d] [File %s]", __LINE__, __FILE__);    \
+    printf("\n");}                                                      \
 
 #define PUBLIC_PORT ("58011")
 #define PUBLIC_IP ("tejo.tecnico.ulisboa.pt")

@@ -162,11 +162,9 @@ int read_timer(int fd) {
     int status = select(fd + 1, &readSet, NULL, NULL, &timeout);
 
     if (status == -1) {
-        MSG("Something went wrong.")
         STATUS("Error in select.")
         return -1;
     } else if (status == 0) {
-        MSG("Something went wrong.")
         STATUS("Timeout occurred. No data received.")
         return -1;
     }
@@ -221,7 +219,10 @@ int cmd_login(istringstream &cmdstream) {
 
     //memset(sv.UDP.buffer,0,128);
 
-    if (read_timer(sv.UDP.fd) == -1) return -1;
+    if (read_timer(sv.UDP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
 
     // sv.UDP.addrlen=sizeof(sv.UDP.addr);
 
@@ -303,7 +304,10 @@ int cmd_logout() {
     //memset(sv.UDP.buffer,0,128);
 
 
-    if (read_timer(sv.UDP.fd) == -1) return -1;
+    if (read_timer(sv.UDP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
 
     // sv.UDP.addrlen=sizeof(sv.UDP.addr);
     size_t n = recvfrom(sv.UDP.fd,sv.UDP.buffer,BUFFER_SIZE,0,(struct sockaddr*) &sv.UDP.addr,&sv.UDP.addrlen);
@@ -384,7 +388,10 @@ int cmd_unregister() {
 
     //memset(sv.UDP.buffer,0,128);
     
-    if (read_timer(sv.UDP.fd) == -1) return -1;
+    if (read_timer(sv.UDP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
 
     //sv.UDP.addrlen=sizeof(sv.UDP.addr);
     size_t n = recvfrom(sv.UDP.fd,sv.UDP.buffer,BUFFER_SIZE,0,(struct sockaddr*) &sv.UDP.addr,&sv.UDP.addrlen);
@@ -545,13 +552,14 @@ int cmd_open(istringstream &cmdstream) {
             return -1;
         }
 
+        size_t total_read = fasset.gcount();
         sv.TCP.buffer[fasset.gcount()] = '\0';
         sbuff += sv.TCP.buffer;
 
         STATUS_WA("Open message sent (if too big, 1st %d bytes): %s", 90,
                     sbuff.substr(0, min(90, static_cast<int>(sbuff.length()))).c_str())
 
-        while(!fasset.eof()) {
+        while(total_read < size) {
             size_t n = write(sv.TCP.fd, sbuff.c_str(), sbuff.length());
             if (n != sbuff.length()) {
                 MSG("Something went wrong.")
@@ -567,7 +575,8 @@ int cmd_open(istringstream &cmdstream) {
             }
 
             sv.TCP.buffer[fasset.gcount()] = '\0';
-            sbuff = sv.TCP.buffer;
+            sbuff = string(sv.TCP.buffer);
+            total_read += fasset.gcount();
         }
 
         if (sbuff.length() < BUFFER_SIZE) {
@@ -602,7 +611,10 @@ int cmd_open(istringstream &cmdstream) {
     size_t n, old_n = 0;
 
     memset(sv.TCP.buffer,0,BUFFER_SIZE + 1);
-    if (read_timer(sv.TCP.fd) == -1) return -1;
+    if (read_timer(sv.TCP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
     n = read(sv.TCP.fd,sv.TCP.buffer, BUFFER_SIZE);
 
     if (n==-1){
@@ -726,7 +738,7 @@ int cmd_close(istringstream &cmdstream){
 
     memset(sv.TCP.buffer,0,BUFFER_SIZE + 1);
 
-    if (read_timer(sv.TCP.fd) == -1) return -1;
+    
     n = read(sv.TCP.fd, sv.TCP.buffer,BUFFER_SIZE);
 
     if (n==-1){
@@ -810,7 +822,10 @@ int cmd_myauctions(){
     }
     STATUS_WA("Myauction message sent: %s", sbuff.c_str())
 
-    if (read_timer(sv.UDP.fd) == -1) return -1;
+    if (read_timer(sv.UDP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
 
     size_t n = recvfrom(sv.UDP.fd,sv.UDP.buffer,BUFFER_SIZE,0,(struct sockaddr*) &sv.UDP.addr,&sv.UDP.addrlen);
     if(n<=0) {
@@ -911,7 +926,10 @@ int cmd_mybids(){
     }
     STATUS_WA("Mybids message sent: %s", sbuff.c_str())
 
-    if (read_timer(sv.UDP.fd) == -1) return -1;
+    if (read_timer(sv.UDP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
 
     size_t n = recvfrom(sv.UDP.fd,sv.UDP.buffer,BUFFER_SIZE,0,(struct sockaddr*) &sv.UDP.addr,&sv.UDP.addrlen);
     if(n<=0) {
@@ -1011,7 +1029,10 @@ int cmd_list(){
     }
     STATUS_WA("List message sent: %s", sbuff.c_str())
 
-    if (read_timer(sv.UDP.fd) == -1) return -1;
+    if (read_timer(sv.UDP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
 
     size_t n = recvfrom(sv.UDP.fd,sv.UDP.buffer,BUFFER_SIZE,0,(struct sockaddr*) &sv.UDP.addr,&sv.UDP.addrlen);
     if(n<=0) {
@@ -1120,11 +1141,14 @@ int cmd_show_asset(istringstream &cmdstream){
         STATUS("Could not send show asset request.")
         return -1;
     }
-    STATUS_WA("Show_asset message sent: %s", sbuff.c_str())
+    STATUS_WA("Show_asset message sent: %s", sbuff.substr(0, sbuff.length() - 1).c_str())
 
     memset(sv.TCP.buffer,0,BUFFER_SIZE+1);
     //le a primeira vez
-    if (read_timer(sv.TCP.fd)==-1) return -1;
+    if (read_timer(sv.TCP.fd)==-1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
     n = read(sv.TCP.fd,sv.TCP.buffer,BUFFER_SIZE);
     //erro a ler
     if (n == -1) {
@@ -1216,7 +1240,10 @@ int cmd_show_asset(istringstream &cmdstream){
             while (1){
                 memset(sv.TCP.buffer,0,BUFFER_SIZE+1);
 
-                if (read_timer(sv.TCP.fd)==-1) return -1;
+                if (read_timer(sv.TCP.fd)==-1) {
+                    MSG("Something went wrong.")
+                    return -1;
+                }
                 n = read(sv.TCP.fd,sv.TCP.buffer,BUFFER_SIZE);
                 if (n==0) break;
                 if(n==-1){
@@ -1338,7 +1365,7 @@ int cmd_bid(istringstream &cmdstream){
 
     memset(sv.TCP.buffer,0,BUFFER_SIZE+1);
 
-    if (read_timer(sv.TCP.fd) == -1) return -1;
+    
 
     n = read(sv.TCP.fd, sv.TCP.buffer, BUFFER_SIZE);
 
@@ -1439,7 +1466,10 @@ int cmd_show_record(istringstream &cmdstream){
     }
     STATUS_WA("Show_record message sent: %s", sbuff.c_str())
 
-    if (read_timer(sv.UDP.fd) == -1) return -1;
+    if (read_timer(sv.UDP.fd) == -1) {
+        MSG("Something went wrong.")
+        return -1;
+    }
 
     size_t n = recvfrom(sv.UDP.fd,sv.UDP.buffer,BUFFER_SIZE,0,(struct sockaddr*) &sv.UDP.addr,&sv.UDP.addrlen);
     if(n <= 0) {
@@ -1674,6 +1704,10 @@ int cmd_show_record(istringstream &cmdstream){
                 
                 bids[num_bids].time = bid_time;
             }
+            
+            MSG_WA("Auction %s info -------------------------------------------------", AID.c_str())
+            MSG_WA("Host: %s\nAuction name: %s\nAsset file name: %s\nStart value: %d\nStart date_time: %s\nTime active: %d sec\n",
+                    host_UID.c_str(),auction_name.c_str(), asset_fname.c_str(), start_value, start_date_time.c_str(), timeactive)
 
             for (int i = 0; i < num_bids; i++) {
                 MSG_WA("Biddder: %s | Value: %d | Date: %s | Time elapsed: %d sec", bids[i].UID.c_str(), bids[i].value, bids[i].date_time.c_str(), bids[i].time)
@@ -1683,9 +1717,9 @@ int cmd_show_record(istringstream &cmdstream){
                 MSG_WA("Auction ended at %s, lasting %d second(s).", end_date_time.c_str(), end_sec)
             }
             else {
-                MSG("Auction is active.")
+                MSG("\nAuction is still active.")
             }
-
+            MSG("-------------------------------------------------------------")
         }
         else if (status == "NOK") MSG_WA("Auction %s does not exist.", AID.c_str())
         else {
