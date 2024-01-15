@@ -543,9 +543,15 @@ int cmd_open(istringstream &cmdstream) {
         sbuff += to_string(size) + " ";
 
         fasset.seekg(0, ios::beg);
-        
+
+        size_t offbuff = sbuff.length();
+
+        strcpy(sv.TCP.buffer, sbuff.c_str());
+
+        size_t n = write(sv.TCP.fd, sv.TCP.buffer, offbuff);
+
         // read BUFFER_SIZE bytes of file to TCP.buffer and send it
-        fasset.read(sv.TCP.buffer, BUFFER_SIZE - sbuff.length());
+        fasset.read(sv.TCP.buffer, BUFFER_SIZE);
         if ((fasset.fail() || fasset.bad()) && !fasset.eof()) {
             MSG("Something went wrong.")
             STATUS("Could not read asset file")
@@ -553,19 +559,28 @@ int cmd_open(istringstream &cmdstream) {
         }
 
         size_t total_read = fasset.gcount();
-        sv.TCP.buffer[fasset.gcount()] = '\0';
-        sbuff += sv.TCP.buffer;
+
+        offbuff = total_read;
 
         STATUS_WA("Open message sent (if too big, 1st %d bytes): %s", 90,
                     sbuff.substr(0, min(90, static_cast<int>(sbuff.length()))).c_str())
 
+        int counter = 0;
+        size_t total_written=0;
+
+        STATUS_WA("%d: total_read: %ld | total_written: %ld", counter, total_read, total_written);
         while(total_read < size) {
-            size_t n = write(sv.TCP.fd, sbuff.c_str(), sbuff.length());
-            if (n != sbuff.length()) {
+            counter++;
+            n = write(sv.TCP.fd, sv.TCP.buffer, offbuff);
+            if (n != offbuff) {
                 MSG("Something went wrong.")
                 STATUS("Could not send open message")
                 return -1;
             }
+
+            total_written += n;
+
+            memset(sv.TCP.buffer,0,BUFFER_SIZE + 1);
 
             fasset.read(sv.TCP.buffer, BUFFER_SIZE);
             if ((fasset.fail() || fasset.bad()) && !fasset.eof()) {
@@ -574,31 +589,35 @@ int cmd_open(istringstream &cmdstream) {
                 return -1;
             }
 
-            sv.TCP.buffer[fasset.gcount()] = '\0';
-            sbuff = string(sv.TCP.buffer);
-            total_read += fasset.gcount();
+            offbuff = fasset.gcount();
+            total_read += offbuff;
+            STATUS_WA("%d: total_read: %ld | total_written: %ld", counter, total_read, total_written);
+
         }
 
-        if (sbuff.length() < BUFFER_SIZE) {
-            sbuff += "\n";
+        if (offbuff < BUFFER_SIZE) {
+            sv.TCP.buffer[offbuff++] = '\n';
         }
 
-        size_t n = write(sv.TCP.fd, sbuff.c_str(), sbuff.length());
-        if (n != sbuff.length()) {
+        n = write(sv.TCP.fd, sv.TCP.buffer, offbuff);
+        total_written += n;
+        if (n != offbuff) {
             MSG("Something went wrong.")
             STATUS("Could not send open message")
             return -1;
         }
 
-        if (sbuff.length() == BUFFER_SIZE) {
-            sbuff = "\n";
-            n = write(sv.TCP.fd, sbuff.c_str(), sbuff.length());
-            if (n != sbuff.length()) {
+        if (offbuff == BUFFER_SIZE) {
+            n = write(sv.TCP.fd, "\n", 1);
+            if (n != 1) {
                 MSG("Something went wrong.")
                 STATUS("Could not send open message")
                 return -1;
             }
+            total_written++;
         }
+
+        STATUS_WA("%d: total_read: %ld | total_written: %ld", counter + 1, total_read, total_written);
     }
     else {
         MSG("Could not open asset file.")
@@ -607,7 +626,6 @@ int cmd_open(istringstream &cmdstream) {
 
     // Reply
     // Read till AS closes socket
-    sv.TCP.buffer[0] = '\0';
     size_t n, old_n = 0;
 
     memset(sv.TCP.buffer,0,BUFFER_SIZE + 1);
@@ -1705,7 +1723,7 @@ int cmd_show_record(istringstream &cmdstream){
                 bids[num_bids].time = bid_time;
             }
             
-            MSG_WA("Auction %s info -------------------------------------------------", AID.c_str())
+            MSG_WA("Auction %s info ---------------------------------------------", AID.c_str())
             MSG_WA("Host: %s\nAuction name: %s\nAsset file name: %s\nStart value: %d\nStart date_time: %s\nTime active: %d sec\n",
                     host_UID.c_str(),auction_name.c_str(), asset_fname.c_str(), start_value, start_date_time.c_str(), timeactive)
 
